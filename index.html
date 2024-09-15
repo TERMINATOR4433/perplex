@@ -1,90 +1,159 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Perplexing Effect - Lively Wallpaper</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body, html {
-            height: 100%;
-            overflow: hidden;
-        }
-        canvas {
-            display: block;
-        }
-    </style>
-</head>
-<body>
-<canvas id="perplexingCanvas"></canvas>
-
-<script>
-    const canvas = document.getElementById('perplexingCanvas');
-    const ctx = canvas.getContext('2d');
-
-    let width = canvas.width = window.innerWidth;
-    let height = canvas.height = window.innerHeight;
-    let particles = [];
-    let colors = ['#f72585', '#b5179e', '#7209b7', '#560bad', '#480ca8', '#3a0ca3', '#3f37c9', '#4361ee', '#4895ef', '#4cc9f0'];
-
-    class Particle {
-        constructor() {
-            this.x = Math.random() * width;
-            this.y = Math.random() * height;
-            this.radius = Math.random() * 3 + 1;
-            this.color = colors[Math.floor(Math.random() * colors.length)];
-            this.speedX = Math.random() * 2 - 1;
-            this.speedY = Math.random() * 2 - 1;
-            this.angle = 0;
-        }
-
-        update() {
-            this.x += Math.sin(this.angle) * this.speedX;
-            this.y += Math.cos(this.angle) * this.speedY;
-            this.angle += 0.05;
-
-            if (this.x < 0 || this.x > width || this.y < 0 || this.y > height) {
-                this.x = Math.random() * width;
-                this.y = Math.random() * height;
+<html>
+    <head>
+        <style>
+            canvas {
+                position: absolute;
+                left: 0;
+                top: 0;
             }
-        }
+        </style>
+    </head>
+    <body>
+        <canvas id="canvas" width="400" height="400"></canvas>
+        <script>
+            class Vector2 {
+                constructor(x, y) {
+                    this.x = x;
+                    this.y = y;
+                }
+                add(vec) {
+                    return new Vector2(this.x + vec.x, this.y + vec.y);
+                }
+                sub(vec) {
+                    return new Vector2(this.x - vec.x, this.y - vec.y);
+                }
+                mul(a) {
+                    return new Vector2(this.x * a, this.y * a);
+                }
+                div(a) {
+                    return new Vector2(this.x / a, this.y / a);
+                }
+                dist(vec) {
+                    var dx = vec.x - this.x;
+                    var dy = vec.y - this.y;
+                    return Math.sqrt(dx * dx + dy * dy);
+                }
+                normalize() {
+                    var length = Math.sqrt(this.x * this.x + this.y * this.y);
+                    if (length > 0) {
+                        return new Vector2(this.x / length, this.y / length);
+                    }
+                    return new Vector2(0, 0);
+                }
+            }
 
-        draw() {
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-            ctx.fillStyle = this.color;
-            ctx.fill();
-        }
-    }
+            class Particle {
+                constructor(position, velocity, radius) {
+                    this.position = position;
+                    this.velocity = velocity;
+                    this.radius = radius;
+                }
+                draw() {
+                    ctx.beginPath();
+                    ctx.arc(this.position.x, this.position.y, this.radius, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+                update(dt) {
+                    this.position = this.position.add(this.velocity.mul(dt));
 
-    function initParticles(numParticles) {
-        for (let i = 0; i < numParticles; i++) {
-            particles.push(new Particle());
-        }
-    }
+                    // Boundary conditions
+                    if (this.position.x < 0) {
+                        this.position.x = 0;
+                        this.velocity.x = -this.velocity.x;
+                    }
+                    if (this.position.x > canvas.width) {
+                        this.position.x = canvas.width;
+                        this.velocity.x = -this.velocity.x;
+                    }
+                    if (this.position.y < 0) {
+                        this.position.y = 0;
+                        this.velocity.y = -this.velocity.y;
+                    }
+                    if (this.position.y > canvas.height) {
+                        this.position.y = canvas.height;
+                        this.velocity.y = -this.velocity.y;
+                    }
+                }
+                applyForce(force) {
+                    this.velocity = this.velocity.add(force);
+                }
+            }
 
-    function animate() {
-        ctx.clearRect(0, 0, width, height);
-        particles.forEach(particle => {
-            particle.update();
-            particle.draw();
-        });
-        requestAnimationFrame(animate);
-    }
+            function getRandom(min, max) {
+                return Math.random() * (max - min) + min;
+            }
 
-    window.addEventListener('resize', () => {
-        width = canvas.width = window.innerWidth;
-        height = canvas.height = window.innerHeight;
-        particles = [];
-        initParticles(100);
-    });
+            var canvas = document.getElementById("canvas");
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            var ctx = canvas.getContext("2d");
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "white";
+            ctx.strokeStyle = "white";
 
-    initParticles(100);
-    animate();
-</script>
-</body>
+            var numParticles = 100; // Number of particles
+            var maxLineDistance = 100; // Distance threshold to draw lines
+            var particles = [];
+            var clickPosition = null; // To store mouse click position
+
+            // Generate particles randomly
+            for (var i = 0; i < numParticles; i++) {
+                particles.push(new Particle(
+                    new Vector2(getRandom(0, canvas.width), getRandom(0, canvas.height)),
+                    new Vector2(getRandom(-0.5, 0.5), getRandom(-0.5, 0.5)),
+                    getRandom(2, 4)
+                ));
+            }
+
+            var lastTime = 0;
+            var dt;
+
+            // Handle mouse click
+            canvas.addEventListener("click", function (event) {
+                clickPosition = new Vector2(event.clientX, event.clientY);
+
+                // Move particles toward the click
+                particles.forEach(particle => {
+                    var direction = clickPosition.sub(particle.position).normalize();
+                    var force = direction.mul(2); // Adjust the speed by multiplying
+                    particle.applyForce(force);
+                });
+            });
+
+            function animate(timeStamp) {
+                ctx.fillStyle = "black";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "white";
+
+                dt = (timeStamp - lastTime) / 16.67; // Normalize frame time to around 60 FPS
+                if (dt > 100) dt = 0;
+
+                // Update and draw particles
+                for (var i = 0; i < numParticles; i++) {
+                    particles[i].draw();
+                    particles[i].update(dt);
+
+                    // Check distances between particles and draw lines if close enough
+                    for (var j = i + 1; j < numParticles; j++) {
+                        var distance = particles[i].position.dist(particles[j].position);
+                        if (distance < maxLineDistance) {
+                            var opacity = 1 - (distance / maxLineDistance);
+                            ctx.beginPath();
+                            ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`; // Line fades as distance increases
+                            ctx.moveTo(particles[i].position.x, particles[i].position.y);
+                            ctx.lineTo(particles[j].position.x, particles[j].position.y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                lastTime = timeStamp;
+                requestAnimationFrame(animate);
+            }
+
+            requestAnimationFrame(animate);
+        </script>
+    </body>
 </html>
